@@ -1,0 +1,57 @@
+'use strict'
+
+ const functions = require('firebase-functions');
+ const admin = require('firebase-admin');
+ admin.initializeApp(functions.config().firebase);
+
+ exports.sendNotification = functions.firestore
+  .document("users/{uid}/Notifications/{nid}")
+  .onCreate((change,context) => {
+	  var valueObject = context.data;
+	 const user_id = context.params.uid;
+	  const notifications_id = context.params.nid; 
+	console.log("userid"+user_id +"notificationId"+notifications_id);
+ return admin.firestore().collection("users").doc(user_id).collection("Notifications")
+ .doc(notifications_id).get().then(queryResult => {
+		const from_user_id = queryResult.data().notification_id;
+		const from_message = queryResult.data().notificationMessage;
+		
+        const from_user_data = admin.firestore().collection('users').doc(from_user_id).get();
+        const to_user_data = admin.firestore().collection('users').doc(user_id).get();
+		   console.log("data:"+to_user_data);
+		return Promise.all([from_user_data, to_user_data]).then(result => {
+
+            const from_name = result[0].data().name;
+            const to_name = result[1].data().name;
+			const tokenId = result[1].data().token_id;
+		 // Create a notification
+    const payload = {
+        notification: {
+            title:"NotificationFrom:"+from_name,
+            body: "message:" +from_message,
+            sound: "default",
+			icon:"default",
+			click_action : "com.pushNotification"
+        },
+		 data : {
+          message : from_message,
+		  from_user_id:from_user_id
+        }
+    }; 
+          
+		return admin.messaging().sendToDevice(tokenId, payload).then(result=>{
+			console.log("notification sent");
+		});
+
+		/* return console.log("FROM: " + from_name + " TO: " + to_name);
+			console.log("data:"+result[0].data().name); */
+        });
+	 
+	}); 
+	 //Create an options object that contains the time to live for the notification and the priority
+  /*   const options = {
+        priority: "high",
+        timeToLive: 60 * 60 * 24
+    }; */
+	//return admin.messaging().sendToDevice("4RWoqJSPbQQoWvx80iHGP8QRWuq1", payload, options);
+  });
